@@ -1,0 +1,768 @@
+openapi: 3.1.0
+info:
+  title: Intelligent Traffic Violation Management API
+  version: 1.0.0-draft
+  description: >
+    Draft REST contract. Protected resources are organisation-scoped. Authentication
+    is delegated to the configured OIDC provider. Fine and enforcement rules are
+    jurisdiction-configured by the deploying authority.
+servers:
+  - url: https://api.example.invalid/v1
+    description: Replace with approved deployment URL.
+security:
+  - bearerAuth: []
+tags:
+  - { name: Vehicles }
+  - { name: Drivers }
+  - { name: Offences }
+  - { name: Violations }
+  - { name: Evidence }
+  - { name: Reviews }
+  - { name: Fines and Notices }
+  - { name: Payments }
+  - { name: Appeals }
+  - { name: Reports }
+paths:
+  /vehicles:
+    get:
+      tags: [Vehicles]
+      summary: Search vehicles
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: registration
+          in: query
+          schema: { type: string, maxLength: 32 }
+        - name: jurisdictionId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Vehicle page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehiclePage' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Vehicles]
+      summary: Create a vehicle record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VehicleCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vehicle' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /vehicles/{vehicleId}:
+    parameters:
+      - $ref: '#/components/parameters/VehicleId'
+    get:
+      tags: [Vehicles]
+      summary: Retrieve vehicle details
+      responses:
+        '200':
+          description: Vehicle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vehicle' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Vehicles]
+      summary: Update editable vehicle fields
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/VehicleUpdate' }
+      responses:
+        '200':
+          description: Updated vehicle
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Vehicle' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /drivers:
+    get:
+      tags: [Drivers]
+      summary: Search driver records
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: name
+          in: query
+          schema: { type: string, maxLength: 120 }
+        - name: licenceLast4
+          in: query
+          schema: { type: string, minLength: 4, maxLength: 4 }
+      responses:
+        '200':
+          description: Driver page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DriverPage' }
+    post:
+      tags: [Drivers]
+      summary: Create a driver record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DriverCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Driver' }
+
+  /offences:
+    get:
+      tags: [Offences]
+      summary: List offences effective at a specified time
+      parameters:
+        - name: jurisdictionId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: eventAt
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Offence catalogue and applicable schedule metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OffencePage' }
+
+  /violations:
+    get:
+      tags: [Violations]
+      summary: Search violation cases
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ViolationStatus' }
+        - name: vehicleId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Violation page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ViolationPage' }
+    post:
+      tags: [Violations]
+      summary: Create a violation case
+      description: >
+        Driver may be null when unknown. Registered owner must not be copied
+        automatically into driverId. This creates a draft/submitted case only.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ViolationCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Violation' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /violations/{violationId}:
+    parameters:
+      - $ref: '#/components/parameters/ViolationId'
+    get:
+      tags: [Violations]
+      summary: Retrieve case details and permitted history
+      responses:
+        '200':
+          description: Violation detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ViolationDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Violations]
+      summary: Update editable draft fields
+      description: Server enforces field mutability according to case state and caller role.
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/ViolationUpdate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Violation' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /violations/{violationId}/submit:
+    post:
+      tags: [Violations]
+      summary: Submit a draft case for review
+      parameters:
+        - $ref: '#/components/parameters/ViolationId'
+      responses:
+        '200':
+          description: Submitted case
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Violation' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /violations/{violationId}/evidence/upload-request:
+    post:
+      tags: [Evidence]
+      summary: Request a short-lived evidence upload target
+      parameters:
+        - $ref: '#/components/parameters/ViolationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvidenceUploadRequest' }
+      responses:
+        '201':
+          description: Upload target
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceUploadTarget' }
+
+  /violations/{violationId}/evidence/{evidenceId}/finalise:
+    post:
+      tags: [Evidence]
+      summary: Finalise upload after server-side validation and hashing
+      parameters:
+        - $ref: '#/components/parameters/ViolationId'
+        - name: evidenceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Finalised evidence metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvidenceAsset' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /violations/{violationId}/review-decision:
+    post:
+      tags: [Reviews]
+      summary: Record an authorised review decision
+      parameters:
+        - $ref: '#/components/parameters/ViolationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewDecisionCreate' }
+      responses:
+        '201':
+          description: Review decision recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewDecision' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /violations/{violationId}/fine-assessments:
+    post:
+      tags: [Fines and Notices]
+      summary: Assess fine using an approved effective schedule
+      parameters:
+        - $ref: '#/components/parameters/ViolationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fineScheduleId: { type: string, format: uuid }
+                adjustmentReason: { type: string, maxLength: 1000 }
+              required: [fineScheduleId]
+      responses:
+        '201':
+          description: Fine assessment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FineAssessment' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /violations/{violationId}/notices:
+    post:
+      tags: [Fines and Notices]
+      summary: Issue notice for approved and assessed violation
+      parameters:
+        - $ref: '#/components/parameters/ViolationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fineAssessmentId: { type: string, format: uuid }
+                recipientPersonId: { type: string, format: uuid }
+                dueAt: { type: string, format: date-time }
+              required: [fineAssessmentId, dueAt]
+      responses:
+        '201':
+          description: Issued notice
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Notice' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /public/notices/{publicReference}:
+    get:
+      tags: [Fines and Notices]
+      security: []
+      summary: Retrieve limited public notice information
+      description: Additional verification and rate controls are required; never reveal unrestricted personal data.
+      parameters:
+        - name: publicReference
+          in: path
+          required: true
+          schema: { type: string, minLength: 16, maxLength: 96 }
+      responses:
+        '200':
+          description: Public notice view
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicNotice' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /notices/{noticeId}/payment-intents:
+    post:
+      tags: [Payments]
+      summary: Create a payment intent with a configured provider
+      parameters:
+        - name: noticeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider: { type: string }
+                amount: { type: number, exclusiveMinimum: 0 }
+                currency: { type: string, pattern: '^[A-Z]{3}$' }
+              required: [provider, amount, currency]
+      responses:
+        '201':
+          description: Payment intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntent' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /webhooks/payments/{provider}:
+    post:
+      tags: [Payments]
+      security: []
+      summary: Receive payment-provider webhook
+      description: Verify signature against raw body; persist and deduplicate before applying state changes.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '202': { description: Accepted for processing }
+        '400': { description: Invalid payload }
+        '401': { description: Invalid signature }
+
+  /notices/{noticeId}/appeals:
+    post:
+      tags: [Appeals]
+      summary: Submit an appeal
+      parameters:
+        - name: noticeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppealCreate' }
+      responses:
+        '201':
+          description: Appeal submitted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Appeal' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /appeals/{appealId}/decision:
+    post:
+      tags: [Appeals]
+      summary: Record authorised appeal decision
+      parameters:
+        - name: appealId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision: { type: string, enum: [upheld, rejected, reduced, remanded] }
+                rationale: { type: string, minLength: 10, maxLength: 4000 }
+              required: [decision, rationale]
+      responses:
+        '200': { description: Decision recorded }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /reports/operations:
+    get:
+      tags: [Reports]
+      summary: Retrieve authorised operational metrics
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Operational summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  countsByStatus:
+                    type: object
+                    additionalProperties: { type: integer, minimum: 0 }
+                  generatedAt: { type: string, format: date-time }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    VehicleId:
+      name: vehicleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ViolationId:
+      name: violationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Unauthenticated: { description: Authentication required }
+    Forbidden: { description: Authenticated but not authorised for this action/resource }
+    NotFound: { description: Resource not found within caller's permitted scope }
+    Conflict: { description: State conflict, duplicate or invalid transition }
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited: { description: Too many requests }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+        correlationId: { type: string }
+      required: [title, status]
+    ViolationStatus:
+      type: string
+      enum: [draft, submitted, under_review, needs_information, approved, rejected, notice_issued, payment_pending, paid, appealed, appeal_upheld, appeal_rejected, cancelled, closed]
+    VehicleCreate:
+      type: object
+      properties:
+        jurisdictionId: { type: string, format: uuid }
+        registration: { type: string, minLength: 2, maxLength: 32 }
+        vehicleClass: { type: string, maxLength: 50 }
+        make: { type: string, maxLength: 80 }
+        model: { type: string, maxLength: 80 }
+        colour: { type: string, maxLength: 40 }
+      required: [jurisdictionId, registration]
+    VehicleUpdate:
+      type: object
+      properties:
+        make: { type: [string, 'null'], maxLength: 80 }
+        model: { type: [string, 'null'], maxLength: 80 }
+        colour: { type: [string, 'null'], maxLength: 40 }
+        verificationStatus: { type: string, enum: [unverified, verified, conflicted, stale] }
+    Vehicle:
+      allOf:
+        - $ref: '#/components/schemas/VehicleCreate'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            registrationNormalised: { type: string }
+            verificationStatus: { type: string }
+            createdAt: { type: string, format: date-time }
+          required: [id, registrationNormalised, createdAt]
+    VehiclePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Vehicle' } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+      required: [items, page, pageSize]
+    DriverCreate:
+      type: object
+      properties:
+        fullName: { type: string, minLength: 1, maxLength: 160 }
+        licenceNumber:
+          type: string
+          writeOnly: true
+          maxLength: 80
+          description: Encrypted at rest; never returned or logged.
+        issuingAuthority: { type: string, maxLength: 120 }
+        licenceClass: { type: string, maxLength: 80 }
+      required: [fullName]
+    Driver:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        licenceLast4: { type: string }
+        licenceStatus: { type: string }
+        verificationStatus: { type: string }
+      required: [id, fullName]
+    DriverPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Driver' } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+      required: [items, page, pageSize]
+    OffencePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              code: { type: string }
+              title: { type: string }
+              description: { type: string }
+              effectiveFrom: { type: string, format: date-time }
+              effectiveUntil: { type: [string, 'null'], format: date-time }
+              fineScheduleVersion: { type: string }
+              amount: { type: number, minimum: 0 }
+              currency: { type: string, pattern: '^[A-Z]{3}$' }
+            required: [id, code, title]
+    ViolationCreate:
+      type: object
+      properties:
+        jurisdictionId: { type: string, format: uuid }
+        vehicleId: { type: string, format: uuid }
+        driverId: { type: [string, 'null'], format: uuid }
+        offenceId: { type: string, format: uuid }
+        eventAt: { type: string, format: date-time }
+        eventTimezone: { type: string, example: Asia/Kolkata }
+        locationText: { type: string, maxLength: 500 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        sourceType: { type: string, enum: [manual, camera, registry_import, partner_api, other] }
+        sourceSystem: { type: string, maxLength: 120 }
+        sourceEventId: { type: string, maxLength: 160 }
+        summary: { type: string, maxLength: 2000 }
+      required: [jurisdictionId, vehicleId, offenceId, eventAt, eventTimezone, sourceType]
+    ViolationUpdate:
+      type: object
+      properties:
+        driverId: { type: [string, 'null'], format: uuid }
+        locationText: { type: [string, 'null'], maxLength: 500 }
+        summary: { type: [string, 'null'], maxLength: 2000 }
+    Violation:
+      allOf:
+        - $ref: '#/components/schemas/ViolationCreate'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            status: { $ref: '#/components/schemas/ViolationStatus' }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+          required: [id, status, createdAt]
+    ViolationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Violation'
+        - type: object
+          properties:
+            evidence: { type: array, items: { $ref: '#/components/schemas/EvidenceAsset' } }
+            reviewHistory: { type: array, items: { $ref: '#/components/schemas/ReviewDecision' } }
+            fineAssessment: { $ref: '#/components/schemas/FineAssessment' }
+            notice: { $ref: '#/components/schemas/Notice' }
+    ViolationPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Violation' } }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+      required: [items, page, pageSize]
+    EvidenceUploadRequest:
+      type: object
+      properties:
+        filename: { type: string, maxLength: 255 }
+        mediaType: { type: string, maxLength: 120 }
+        byteSize: { type: integer, minimum: 1, maximum: 52428800 }
+        assetKind: { type: string, enum: [image, video, document, metadata] }
+      required: [filename, mediaType, byteSize, assetKind]
+    EvidenceUploadTarget:
+      type: object
+      properties:
+        evidenceId: { type: string, format: uuid }
+        uploadUrl: { type: string, format: uri }
+        expiresAt: { type: string, format: date-time }
+        requiredHeaders: { type: object, additionalProperties: { type: string } }
+      required: [evidenceId, uploadUrl, expiresAt]
+    EvidenceAsset:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        assetKind: { type: string }
+        mediaType: { type: string }
+        byteSize: { type: integer }
+        sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+        capturedAt: { type: [string, 'null'], format: date-time }
+        scanStatus: { type: string }
+        status: { type: string }
+      required: [id, assetKind, mediaType, byteSize, sha256, status]
+    ReviewDecisionCreate:
+      type: object
+      properties:
+        decision: { type: string, enum: [approved, rejected, needs_information] }
+        rationale: { type: string, minLength: 10, maxLength: 4000 }
+      required: [decision, rationale]
+    ReviewDecision:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        decision: { type: string }
+        rationale: { type: string }
+        actorUserId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+      required: [id, decision, rationale, actorUserId, createdAt]
+    FineAssessment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        scheduleVersion: { type: string }
+        baseAmount: { type: number, minimum: 0 }
+        finalAmount: { type: number, minimum: 0 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        assessedAt: { type: string, format: date-time }
+      required: [id, scheduleVersion, baseAmount, finalAmount, currency, assessedAt]
+    Notice:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        publicReference: { type: string }
+        issuedAt: { type: string, format: date-time }
+        dueAt: { type: [string, 'null'], format: date-time }
+        status: { type: string, enum: [issued, cancelled, superseded, closed] }
+        amount: { type: number, minimum: 0 }
+        currency: { type: string }
+      required: [id, publicReference, issuedAt, status]
+    PublicNotice:
+      type: object
+      properties:
+        publicReference: { type: string }
+        offenceDescription: { type: string }
+        eventAt: { type: string, format: date-time }
+        vehicleRegistrationMasked: { type: string }
+        amountDue: { type: number, minimum: 0 }
+        currency: { type: string }
+        dueAt: { type: [string, 'null'], format: date-time }
+        status: { type: string }
+      required: [publicReference, offenceDescription, eventAt, amountDue, currency, status]
+    PaymentIntent:
+      type: object
+      properties:
+        paymentId: { type: string, format: uuid }
+        status: { type: string, enum: [created, pending] }
+        provider: { type: string }
+        checkoutUrl: { type: string, format: uri }
+        expiresAt: { type: [string, 'null'], format: date-time }
+      required: [paymentId, status, provider, checkoutUrl]
+    AppealCreate:
+      type: object
+      properties:
+        appellantVerificationToken: { type: string, writeOnly: true }
+        reasonCode: { type: string, maxLength: 80 }
+        reasonText: { type: string, minLength: 20, maxLength: 5000 }
+      required: [reasonText]
+    Appeal:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string }
+        filedAt: { type: string, format: date-time }
+        decision: { type: [string, 'null'] }
+        decisionReason: { type: [string, 'null'] }
+      required: [id, status, filedAt]

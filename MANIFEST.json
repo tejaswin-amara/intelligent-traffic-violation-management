@@ -1,0 +1,31 @@
+{
+  "project": "Intelligent Traffic Violation Management",
+  "generated_on": "2026-10-30",
+  "content_file_count": 24,
+  "files": [
+    "README.md",
+    "api/openapi.yaml",
+    "database/schema.sql",
+    "docs/00-project-charter.md",
+    "docs/01-product-requirements.md",
+    "docs/02-software-requirements.md",
+    "docs/03-domain-model.md",
+    "docs/04-architecture.md",
+    "docs/05-database-design.md",
+    "docs/06-security-privacy-compliance.md",
+    "docs/07-ai-evidence-governance.md",
+    "docs/08-ux-workflows.md",
+    "docs/09-testing-quality.md",
+    "docs/10-deployment-operations.md",
+    "docs/11-implementation-roadmap.md",
+    "docs/12-acceptance-criteria.md",
+    "docs/13-risk-register.md",
+    "docs/14-developer-contribution.md",
+    "docs/15-glossary.md",
+    "docs/adr/ADR-001-modular-monolith.md",
+    "docs/adr/ADR-002-evidence-object-storage.md",
+    "docs/adr/ADR-003-human-review-before-issuance.md",
+    "docs/adr/ADR-004-payment-provider-adapter.md",
+    "docs/adr/ADR-005-jurisdiction-configurable-policy.md"
+  ]
+}
