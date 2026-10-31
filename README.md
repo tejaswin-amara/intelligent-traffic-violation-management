@@ -1,59 +1,53 @@
 # Intelligent Traffic Violation Management (ITVM)
 
-Development documentation pack for a platform that records, manages, reviews, and tracks traffic violations and associated fines.
+An intelligent, multitenant traffic violation enforcement platform demonstrating robust modular-monolith backend design, secure cryptography, timezone-aware analytics, temporal data resolution, and idempotent financial webhook flows.
 
-## Product lifecycle
+## Core Features
+1. **Multitenancy & RBAC:** Organization-isolated enforcement with granular roles.
+2. **Cryptographic Identity Protection:** Authenticated AES encryption with deterministic HMAC lookups for sensitive PII (Licenses).
+3. **Temporal Fine Engine:** Resilient chronological evaluation linking exact historical fine parameters to localized violation timestamps.
+4. **Idempotent Ledgers:** Signed webhook evaluation ensuring duplicate payment integrations safely bounce.
 
-Vehicle/driver records → violation capture → evidence verification → officer review → fine assessment → notice/challan issuance → payment or appeal → reconciliation and closure.
+## Technology Stack
+- **Backend:** Python 3.12+, FastAPI, PostgreSQL, SQLAlchemy, Alembic, Passlib, Cryptography
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS, TanStack Query
 
-A vehicle, registered owner, driver, violation, evidence asset, fine assessment, notice, payment, and appeal are separate records. The registered owner is not automatically the person who drove the vehicle. An AI detection is a candidate for review, not proof of an offence.
+## Prerequisites
+- Docker & Docker Compose
+- `uv` (Python 3.12+)
+- `pnpm` (Node.js 20.19+ or 22.12+)
 
-## Documentation index
+## Setup Instructions
 
-| File | Purpose |
-|---|---|
-| `docs/00-project-charter.md` | Vision, scope, assumptions, stakeholders |
-| `docs/01-product-requirements.md` | Personas, capabilities, priorities, business rules |
-| `docs/02-software-requirements.md` | Functional and non-functional requirements |
-| `docs/03-domain-model.md` | Entities, relationships, state machine, invariants |
-| `docs/04-architecture.md` | Architecture, module boundaries, integrations |
-| `docs/05-database-design.md` | Data model, retention, migration strategy |
-| `database/schema.sql` | PostgreSQL baseline schema |
-| `api/openapi.yaml` | Draft OpenAPI 3.1 API contract |
-| `docs/06-security-privacy-compliance.md` | Security, privacy, evidence and audit controls |
-| `docs/07-ai-evidence-governance.md` | AI/ANPR governance and evidence provenance |
-| `docs/08-ux-workflows.md` | Screens, roles, workflows and accessibility |
-| `docs/09-testing-quality.md` | Test strategy and quality gates |
-| `docs/10-deployment-operations.md` | Environments, CI/CD, monitoring, backup, incidents |
-| `docs/11-implementation-roadmap.md` | Phases, epics and delivery gates |
-| `docs/12-acceptance-criteria.md` | MVP release checklist |
-| `docs/13-risk-register.md` | Key risks and mitigations |
-| `docs/14-developer-contribution.md` | Repository, review, coding and change standards |
-| `docs/15-glossary.md` | Shared vocabulary |
-| `docs/adr/` | Architecture decision records |
+### 1. Database
+```bash
+docker-compose up -d
+```
+Creates PostgreSQL bound locally (`127.0.0.1:5432`) mapped to credentials: `itvm_user:itvm_password`.
 
-## Recommended baseline
+### 2. Backend
+```bash
+cd backend
+cp .env.example .env
+uv sync
+uv run alembic upgrade head
+uv run python seed_demo.py
+uv run fastapi dev app/main.py
+```
+*Note: Generating a `.env` dynamically populates the secure sandbox configurations necessary to execute the server.*
 
-Use a modular monolith with clearly separated domain modules, PostgreSQL for transactional records, private object storage for evidence, a background worker for asynchronous tasks, and a payment-provider adapter. Run API and worker as separate processes/containers from one codebase. Avoid microservices until measured scale, team ownership, or isolation requirements justify them.
+### 3. Frontend
+```bash
+cd frontend
+cp .env.example .env
+pnpm install
+pnpm run dev
+```
+Navigate to `http://localhost:5173`.
 
-The schema is PostgreSQL-oriented; the API contract uses OpenAPI 3.1. Programming language, UI framework, identity provider, hosting environment, queue, and payment provider remain implementation decisions.
+## Demo
+Use `demo@example.com` / `password123` to enter the application as an authorized local admin to interact with the seeded models securely.
 
-## Assumptions requiring sign-off
-
-- The first deployment jurisdiction and enforcement authority have not been specified. Offence codes, fine amounts, due dates, appeal windows, notice formats, evidence retention and access rules must be supplied from current authorised sources. Never hard-code assumed legal values.
-- Production use requires an authorised enforcement body, approved users, approved data sources and an approved operating procedure.
-- AI is optional and disabled by default. It may assist with plate reading or event classification, but must not issue fines autonomously by default.
-- Vehicle/driver registry access requires legal and contractual approval.
-- Payment credentials remain with an external payment provider; ITVM stores provider references and payment outcomes, not raw card/bank credentials.
-- Government registry, camera/VMS, payment, identity and notification integrations require official interface documentation and test access.
-
-## How to use this pack
-
-1. Confirm jurisdiction, deploying authority, user roles, legal basis and hosting/data-residency requirements.
-2. Review the PRD and SRS; mark each requirement in-scope, deferred or excluded.
-3. Approve the domain rules, architecture decisions and threat model.
-4. Review the SQL and API contract; convert them into versioned migrations and a validated API spec.
-5. Map requirement IDs to backlog items and automated tests.
-6. Obtain legal, security, privacy and operational sign-off before pilot/go-live.
-
-This pack is a project-development baseline, not legal advice, a government-approved enforcement specification, or a claim that any external integration is available.
+## Limitations
+- OCR/ANPR models remain local structural placeholders.
+- Real Payment Gateways require active ingress URLs outside of the local sandbox environment.
