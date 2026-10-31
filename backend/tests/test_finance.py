@@ -93,7 +93,7 @@ def test_assess_fine(setup_finance_data):
 
     response = client.post(
         f"/api/violations/{vio_id}/assess",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_finance_data["org_id"])}
     )
     assert response.status_code == 200
     data = response.json()
@@ -108,7 +108,7 @@ def test_issue_notice(setup_finance_data):
 
     response = client.post(
         f"/api/assessments/{assess_id}/issue-notice",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_finance_data["org_id"])}
     )
     assert response.status_code == 200
     data = response.json()
@@ -125,7 +125,7 @@ def test_payment_intent_and_webhook(setup_finance_data):
 
     intent_resp = client.post(
         "/api/payments/intent",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_finance_data["org_id"])},
         json={
             "notice_id": notice_id,
             "amount": 100.0,
@@ -171,7 +171,7 @@ def test_appeals(setup_finance_data):
     # Submit
     appeal_resp = client.post(
         "/api/appeals/",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_finance_data["org_id"])},
         json={
             "notice_id": notice_id,
             "reason_text": "I was not driving."
@@ -183,7 +183,7 @@ def test_appeals(setup_finance_data):
     # Review
     review_resp = client.post(
         f"/api/appeals/{appeal_id}/review",
-        headers={"Authorization": f"Bearer {reviewer_token}"},
+        headers={"Authorization": f"Bearer {reviewer_token}", "X-Organisation-ID": str(setup_finance_data["org_id"])},
         json={
             "decision": "upheld",
             "decision_reason": "Verified driver claim."

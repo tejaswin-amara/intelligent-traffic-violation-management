@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import uuid
@@ -7,7 +7,8 @@ from datetime import datetime
 
 from ..core.database import get_db
 from ..models.violation import Violation, EvidenceAsset, ReviewDecision
-from .auth import get_current_user
+from ..models.domain import Offence
+from .auth import get_current_user, get_current_active_organisation
 from ..models.auth import User, Membership
 
 router = APIRouter()
@@ -41,14 +42,13 @@ class ReviewDecisionCreate(BaseModel):
 
 @router.post("/", response_model=ViolationResponse, status_code=status.HTTP_201_CREATED)
 def create_violation(
+    request: Request,
     violation: ViolationCreate,
     db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_active_organisation),
     current_user: User = Depends(get_current_user)
 ):
-    user_with_mems = db.query(User).options(joinedload(User.memberships)).filter(User.id == current_user.id).first()
-    if not user_with_mems or not user_with_mems.memberships:
-        raise HTTPException(status_code=403, detail="User has no active organisation membership")
-    org_id = user_with_mems.memberships[0].organisation_id
+    org_id = membership.organisation_id
 
     db_violation = Violation(
         organisation_id=org_id,
@@ -73,34 +73,30 @@ def create_violation(
 
 @router.get("/", response_model=List[ViolationResponse])
 def get_violations(
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    membership: Membership = Depends(get_current_active_organisation),
     skip: int = 0,
     limit: int = 100
 ):
-    user_with_mems = db.query(User).options(joinedload(User.memberships)).filter(User.id == current_user.id).first()
-    if not user_with_mems or not user_with_mems.memberships:
-        raise HTTPException(status_code=403, detail="User has no active organisation membership")
-    org_id = user_with_mems.memberships[0].organisation_id
+    org_id = membership.organisation_id
     violations = db.query(Violation).filter(Violation.organisation_id == org_id).offset(skip).limit(limit).all()
     return violations
 
 @router.post("/{violation_id}/review", response_model=ViolationResponse)
 def review_violation(
+    request: Request,
     violation_id: uuid.UUID,
     decision: ReviewDecisionCreate,
     db: Session = Depends(get_db),
+    membership: Membership = Depends(get_current_active_organisation),
     current_user: User = Depends(get_current_user)
 ):
-    user_with_mems = db.query(User).options(joinedload(User.memberships)).filter(User.id == current_user.id).first()
-    if not user_with_mems or not user_with_mems.memberships:
-        raise HTTPException(status_code=403, detail="User has no active organisation membership")
-    org_id = user_with_mems.memberships[0].organisation_id
+    org_id = membership.organisation_id
 
-    is_reviewer = any(m.role in ["reviewer", "super_admin", "agency_admin"] for m in user_with_mems.memberships if m.organisation_id == org_id)
+    is_reviewer = membership.role in ["reviewer", "super_admin", "agency_admin"]
     if not is_reviewer:
-        roles = [m.role for m in user_with_mems.memberships]
-        raise HTTPException(status_code=403, detail=f"User does not have review permissions. Roles: {roles}")
+        raise HTTPException(status_code=403, detail=f"User does not have review permissions. Role: {membership.role}")
 
     violation = db.query(Violation).filter(Violation.id == violation_id, Violation.organisation_id == org_id).first()
     if not violation:
@@ -108,6 +104,19 @@ def review_violation(
 
     if violation.created_by == current_user.id:
         raise HTTPException(status_code=403, detail="Creator cannot review their own violation")
+
+    valid_decisions = ["approved", "rejected", "needs_information", "cancelled"]
+    if decision.decision not in valid_decisions:
+        raise HTTPException(status_code=422, detail="Invalid decision.")
+
+    # Evidence enforcement on approval
+    if decision.decision == "approved":
+        offence = db.query(Offence).filter(Offence.id == violation.offence_id).first()
+        if offence and getattr(offence, "evidence_required", False):
+            # Check for associated evidence
+            evidence = db.query(EvidenceAsset).filter(EvidenceAsset.violation_id == violation.id).first()
+            if not evidence:
+                raise HTTPException(status_code=422, detail="Approval requires valid evidence associated with the violation.")
 
     db_decision = ReviewDecision(
         organisation_id=org_id,
@@ -118,13 +127,15 @@ def review_violation(
     )
     db.add(db_decision)
 
-    # Simple state transition
+    # State transitions
     if decision.decision == "approved":
         violation.status = "approved"
     elif decision.decision == "rejected":
         violation.status = "rejected"
     elif decision.decision == "needs_information":
         violation.status = "needs_information"
+    elif decision.decision == "cancelled":
+        violation.status = "cancelled"
 
     db.commit()
     db.refresh(violation)

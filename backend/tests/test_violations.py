@@ -77,7 +77,7 @@ def test_create_violation(setup_violation_data):
     token = setup_violation_data["officer_token"]
     response = client.post(
         "/api/violations/",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_violation_data["org_id"])},
         json={
             "jurisdiction_id": str(setup_violation_data["jur_id"]),
             "vehicle_id": str(setup_violation_data["veh_id"]),
@@ -92,12 +92,12 @@ def test_create_violation(setup_violation_data):
 def test_upload_evidence(setup_violation_data):
     token = setup_violation_data["officer_token"]
     # Get the violation we just created
-    resp = client.get("/api/violations/", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/api/violations/", headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_violation_data["org_id"])})
     vio_id = resp.json()[0]["id"]
 
     response = client.post(
         f"/api/violations/{vio_id}/evidence",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "X-Organisation-ID": str(setup_violation_data["org_id"])},
         data={"asset_kind": "image"},
         files={"file": ("test.jpg", b"fake_image_content", "image/jpeg")}
     )
@@ -115,7 +115,7 @@ def test_reviewer_approve_violation(setup_violation_data):
     # to avoid state issues from other tests
     response = client.post(
         "/api/violations/",
-        headers={"Authorization": f"Bearer {officer_token}"},
+        headers={"Authorization": f"Bearer {officer_token}", "X-Organisation-ID": str(setup_violation_data["org_id"])},
         json={
             "jurisdiction_id": str(setup_violation_data["jur_id"]),
             "vehicle_id": str(setup_violation_data["veh_id"]),
@@ -129,7 +129,7 @@ def test_reviewer_approve_violation(setup_violation_data):
     # Creator cannot approve
     bad_resp = client.post(
         f"/api/violations/{vio_id}/review",
-        headers={"Authorization": f"Bearer {officer_token}"},
+        headers={"Authorization": f"Bearer {officer_token}", "X-Organisation-ID": str(setup_violation_data["org_id"])},
         json={"decision": "approved", "rationale": "Looks good"}
     )
     assert bad_resp.status_code == 403
@@ -137,7 +137,7 @@ def test_reviewer_approve_violation(setup_violation_data):
     # Reviewer can approve
     good_resp = client.post(
         f"/api/violations/{vio_id}/review",
-        headers={"Authorization": f"Bearer {reviewer_token}"},
+        headers={"Authorization": f"Bearer {reviewer_token}", "X-Organisation-ID": str(setup_violation_data["org_id"])},
         json={"decision": "approved", "rationale": "Looks good"}
     )
     if good_resp.status_code != 200:

@@ -10,14 +10,14 @@ class Organisation(Base):
     name = Column(String(120), nullable=False)
     code = Column(String(40), unique=True, nullable=False)
     status = Column(String, default='active', nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 class User(Base):
     __tablename__ = 'users'
 
     identity_provider = Column(String, nullable=False)
     identity_subject = Column(String, nullable=False)
-    email = Column(String(255))
+    email = Column(String(255), unique=True, nullable=False) # Make email unique
     display_name = Column(String(160), nullable=False)
     status = Column(String, default='active', nullable=False)
 

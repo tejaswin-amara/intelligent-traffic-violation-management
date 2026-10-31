@@ -1,64 +1,53 @@
-# Intelligent Traffic Violation Management (ITVM) Platform
+# Intelligent Traffic Violation Management (ITVM)
 
-A comprehensive enterprise-grade platform for enforcing and managing traffic violations, fine calculations, and appeals.
+An intelligent, multitenant traffic violation enforcement platform demonstrating robust modular-monolith backend design, secure cryptography, timezone-aware analytics, temporal data resolution, and idempotent financial webhook flows.
 
-## Architecture
+## Core Features
+1. **Multitenancy & RBAC:** Organization-isolated enforcement with granular roles.
+2. **Cryptographic Identity Protection:** Authenticated AES encryption with deterministic HMAC lookups for sensitive PII (Licenses).
+3. **Temporal Fine Engine:** Resilient chronological evaluation linking exact historical fine parameters to localized violation timestamps.
+4. **Idempotent Ledgers:** Signed webhook evaluation ensuring duplicate payment integrations safely bounce.
 
-This project is structured as a **modular monolith** consisting of:
-- **Backend**: Python 3.12, FastAPI, SQLAlchemy (PostgreSQL), Alembic, Pydantic, Passlib, python-jose (JWT).
-- **Frontend**: React 19, Vite, TypeScript, TailwindCSS v4, React Router, React Query, Lucide-React.
-- **Database**: PostgreSQL 15 via Docker Compose.
+## Technology Stack
+- **Backend:** Python 3.12+, FastAPI, PostgreSQL, SQLAlchemy, Alembic, Passlib, Cryptography
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS, TanStack Query
 
-## Features
-
-- **RBAC & Tenancy**: Multi-tenant architecture with strict organization data isolation and Role-Based Access Control (e.g. `agency_admin`, `enforcement_officer`, `reviewing_officer`, `finance_officer`).
-- **Domain Registries**: Management of Jurisdictions, Persons, Vehicles, and Drivers.
-- **Violation Lifecycle**: Officers capture violations. Reviewers approve or reject. The state is strictly enforced through a FastAPI API.
-- **Evidence Management**: Secure handling of digital evidence assets (mocked object storage via file endpoints).
-- **Deterministic Fines & Notices**: Fine amounts are calculated automatically and deterministically via effective-dated schedules.
-- **Financial Workflows**: Idempotent payment intent handling, secure mock webhook processing, and ledger entries for reconciliation.
-- **Appeals Engine**: Complete support for handling violation appeals.
-- **Analytics & Dashboards**: Operational metrics exposed natively.
-
-## Local Setup
-
-### 1. Requirements
-
+## Prerequisites
 - Docker & Docker Compose
-- `uv` (Fast Python packaging)
-- `pnpm` (Fast Node.js packaging)
-- Python 3.12+
-- Node.js 18+
+- `uv` (Python 3.12+)
+- `pnpm` (Node.js 20.19+ or 22.12+)
 
-### 2. Start PostgreSQL
+## Setup Instructions
 
+### 1. Database
 ```bash
-docker compose up -d
+docker-compose up -d
 ```
+Creates PostgreSQL bound locally (`127.0.0.1:5432`) mapped to credentials: `itvm_user:itvm_password`.
 
-### 3. Backend Setup
-
+### 2. Backend
 ```bash
 cd backend
-# Create env
+cp .env.example .env
 uv sync
-# Run database migrations
 uv run alembic upgrade head
-# Start local API
-uv run uvicorn app.main:app --reload
+uv run python seed_demo.py
+uv run fastapi dev app/main.py
 ```
+*Note: Generating a `.env` dynamically populates the secure sandbox configurations necessary to execute the server.*
 
-### 4. Frontend Setup
-
+### 3. Frontend
 ```bash
 cd frontend
+cp .env.example .env
 pnpm install
 pnpm run dev
 ```
+Navigate to `http://localhost:5173`.
 
-### 5. Running Tests
+## Demo
+Use `demo@example.com` / `password123` to enter the application as an authorized local admin to interact with the seeded models securely.
 
-```bash
-cd backend
-uv run pytest tests/ -s
-```
+## Limitations
+- OCR/ANPR models remain local structural placeholders.
+- Real Payment Gateways require active ingress URLs outside of the local sandbox environment.

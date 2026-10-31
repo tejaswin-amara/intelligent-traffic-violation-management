@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { fetchWithAuth } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface User {
   id: string;
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let mounted = true;
@@ -28,10 +30,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       fetchWithAuth('/auth/me')
         .then((userData) => {
-          if (mounted) setUser(userData);
+          if (mounted) {
+            setUser(userData);
+            if (userData.memberships && userData.memberships.length > 0) {
+              const activeMembership = userData.memberships.find((m: any) => m.status === 'active');
+              if (activeMembership) {
+                  localStorage.setItem('organisation_id', activeMembership.organisation_id);
+              }
+            }
+          }
         })
-        .catch(() => {
-          localStorage.removeItem('access_token');
+        .catch((err) => {
+          if (err.message.includes("401")) {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('organisation_id');
+            if (mounted) setUser(null);
+          }
         })
         .finally(() => {
           if (mounted) setIsLoading(false);
@@ -47,11 +61,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (token: string, userData: User) => {
     localStorage.setItem('access_token', token);
+    if (userData.memberships && userData.memberships.length > 0) {
+       const activeMembership = userData.memberships.find((m: any) => m.status === 'active');
+       if (activeMembership) {
+           localStorage.setItem('organisation_id', activeMembership.organisation_id);
+       }
+    }
     setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('organisation_id');
+    queryClient.clear(); // Clear all cached data on logout for isolation
     setUser(null);
   };
 
